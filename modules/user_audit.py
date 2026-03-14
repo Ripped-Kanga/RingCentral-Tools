@@ -33,6 +33,10 @@ def run(client):
             break
         print("Audit name cannot be empty.")
 
+    # Fetch account-level company name as fallback for per-user contact.company
+    account_resp = rate_limit_get(client, '/restapi/v1.0/account/~')
+    account_company = account_resp.get('name') if account_resp else None
+
     # Filter and field selection
     filter_user_count, user_count, built_url = audit_checker(client, '/restapi/v1.0/account/~/extension')
     fields = prep_user_csv()
@@ -215,7 +219,7 @@ def run(client):
             **({'Extension Status': user_data.get('status')} if fields['status'] else {}),
             **({'Extension Type': ext_type} if fields['type'] else {}),
             **({'Site': user_data.get('site', {}).get('name')} if fields['site'] else {}),
-            **({'Company': user_data.get('contact', {}).get('company')} if fields['company'] else {}),
+            **({'Company': user_data.get('contact', {}).get('company') or account_company} if fields['company'] else {}),
             **({'Department': user_data.get('contact', {}).get('department')} if fields['department'] else {}),
             **({'Job Title': user_data.get('contact', {}).get('jobTitle')} if fields['job_title'] else {}),
             **({'Email': user_data.get('contact', {}).get('email')} if fields['email'] else {}),
