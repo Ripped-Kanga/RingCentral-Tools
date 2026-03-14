@@ -34,8 +34,8 @@ def run(client):
         print("Audit name cannot be empty.")
 
     # Fetch account-level company name as fallback for per-user contact.company
-    account_resp = rate_limit_get(client, '/restapi/v1.0/account/~')
-    account_company = account_resp.get('name') if account_resp else None
+    account_resp = rate_limit_get(client, '/restapi/v2/account/~')
+    account_company = account_resp.get('companyName') if account_resp else None
 
     # Filter and field selection
     filter_user_count, user_count, built_url = audit_checker(client, '/restapi/v1.0/account/~/extension')
