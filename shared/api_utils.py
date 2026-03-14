@@ -29,13 +29,13 @@ def connection_test(client):
     Verifies API connectivity and prints company info.
     Prompts the user to confirm the account before proceeding.
     """
-    account_resp = rate_limit_get(client, '/restapi/v1.0/account/~')
+    account_resp = rate_limit_get(client, '/restapi/v2/accounts/~')
     service_resp = rate_limit_get(client, '/restapi/v1.0/account/~/service-info')
 
     if account_resp is None:
         sys.exit("Failed to reach the RingCentral API. Check your credentials and try again.")
 
-    company_name = account_resp.get('name', 'N/A')
+    company_name = account_resp.get('companyName', 'N/A')
     company_status = account_resp.get('status', 'N/A')
     company_number = account_resp.get('mainNumber', 'N/A')
 
