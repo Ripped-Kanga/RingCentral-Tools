@@ -1,5 +1,4 @@
 import csv
-import datetime
 from pathlib import Path
 
 
@@ -21,10 +20,6 @@ def build_csv(datalist, audit_file_name, date_stamp):
     file_name = f'{audit_file_name}-{date_stamp}.csv'
     file_path = AUDIT_DIR / file_name
 
-    if file_path.exists():
-        ts = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        file_path = AUDIT_DIR / file_name.replace('.csv', f'_{ts}.csv')
-
     fieldnames = list(datalist[0].keys())
     with open(file_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
@@ -44,10 +39,6 @@ def cq_build_csv(datalist, audit_file_name, date_stamp):
 
     file_name = f'{audit_file_name}-CallQueueDetails-{date_stamp}.csv'
     file_path = AUDIT_DIR / file_name
-
-    if file_path.exists():
-        ts = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        file_path = AUDIT_DIR / file_name.replace('.csv', f'_{ts}.csv')
 
     fieldnames = list(datalist[0].keys())
     with open(file_path, 'w', newline='', encoding='utf-8') as f:
