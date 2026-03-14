@@ -144,6 +144,7 @@ ENV/
 env.bak/
 venv.bak/
 rc_token.json
+AuditResults/
 # Spyder project settings
 .spyderproject
 .spyproject
