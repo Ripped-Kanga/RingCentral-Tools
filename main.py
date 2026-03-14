@@ -87,6 +87,8 @@ def main():
         except Exception as e:
             print(f"Module '{chosen}' encountered an error: {e}")
 
+        input("Press Enter to return to the main menu (or CTRL+C to exit)...")
+
 
 if __name__ == "__main__":
     try:
