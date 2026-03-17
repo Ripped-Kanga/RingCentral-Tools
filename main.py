@@ -5,13 +5,13 @@ __author__ = "Alan Saunders"
 __purpose__ = "Use the RingCentral API to collect information on the instance, useful for conducting audits and health checks on RingCentral instances."
 __version__ = "0.2"
 __github__ = "https://github.com/Ripped-Kanga/RingCentral-Tools\n"
-__disclaimer__ = "The purpose of this project is to provide easy auditability to the RingCentral platform. All the API calls made in this project are GET requests and represent no danger to the RingCentral data. To exit the script at any time, use CTRL + C. All data collected by this tool is written to CSV file, the file is stored in the /AuditResults folder."
+__disclaimer__ = "The purpose of this project is to provide easy auditability and administration of the RingCentral platform. Most modules are read-only (GET requests only). Modules that perform write operations will clearly indicate this and require explicit confirmation before making changes. To exit the script at any time, use CTRL + C. All audit data is written to CSV files stored in the /AuditResults folder."
 
 
 # Import libraries
 from client_auth.client import RingCentralOAuthClient
 from shared.api_utils import connection_test
-from modules import user_audit
+from modules import user_audit, auto_receptionist
 import argparse
 import sys
 
@@ -27,7 +27,8 @@ API_BASE_URL = "https://platform.ringcentral.com"
 
 # Module registry — add new modules here as a display name: module mapping
 MODULE_REGISTRY = {
-    "User Extension Audit": user_audit,
+    "User Extension Audit":          user_audit,
+    "Auto-Receptionist Rules":       auto_receptionist,
 }
 
 

@@ -24,6 +24,26 @@ def rate_limit_get(client, endpoint):
                 raise
 
 
+def rate_limit_post(client, endpoint, json_body):
+    """Wraps client.api_post() with rate-limit handling and 5xx retry.
+    Unlike rate_limit_get, 4xx errors are raised — a failed POST means bad
+    input or insufficient permissions that the user needs to know about."""
+    while True:
+        try:
+            return client.api_post(endpoint, json_body)
+        except requests.HTTPError as e:
+            status = e.response.status_code
+            if status == 429:
+                retry_after = int(e.response.headers.get('Retry-After', 60))
+                print(f'Rate limit hit. Pausing {retry_after} seconds before retrying...')
+                time.sleep(retry_after)
+            elif status >= 500:
+                print(f'Server error {status}. Retrying in 5 seconds...')
+                time.sleep(5)
+            else:
+                raise
+
+
 def connection_test(client):
     """
     Verifies API connectivity and prints company info.
