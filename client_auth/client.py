@@ -124,3 +124,9 @@ class RingCentralOAuthClient:
         response = requests.get(f"{self.api_base_url}{endpoint}", headers=headers)
         response.raise_for_status()
         return response.json()
+
+    def api_post(self, endpoint, json_body):
+        headers = {'Authorization': f"Bearer {self.get_access_token()}"}
+        response = requests.post(f"{self.api_base_url}{endpoint}", headers=headers, json=json_body)
+        response.raise_for_status()
+        return response.json()
