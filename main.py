@@ -11,7 +11,7 @@ __disclaimer__ = "The purpose of this project is to provide easy auditability an
 # Import libraries
 from client_auth.client import RingCentralOAuthClient
 from shared.api_utils import connection_test
-from modules import user_audit, auto_receptionist
+from modules import user_audit, auto_receptionist, diagnostics
 import argparse
 import sys
 
@@ -29,6 +29,7 @@ API_BASE_URL = "https://platform.ringcentral.com"
 MODULE_REGISTRY = {
     "User Extension Audit":          user_audit,
     "Auto-Receptionist Rules":       auto_receptionist,
+    "Diagnostics":                   diagnostics,
 }
 
 

@@ -63,6 +63,34 @@ Manages custom answering rules on the company Auto-Receptionist.
 
 ---
 
+### Diagnostics
+Read-only troubleshooting tools for a live RingCentral instance.
+
+**Handset Registration Poll**
+- Polls the registration status of account devices at a user-controlled interval (minimum 10 seconds)
+- Watch all device types or a selection (HardPhone, SoftPhone, OtherPhone, WebPhone, Paging, Room)
+- Reports every Online ↔ Offline transition as it happens, with device name, model, serial, and extension
+- Optionally appends each status change to a timestamped CSV event log
+- Automatically refreshes the OAuth token during long polling sessions
+- Press **CTRL+C** to stop polling and see a session summary
+
+**Device Status Snapshot**
+- One-shot report of every device on the account with status counts (Online/Offline)
+- Optional CSV export
+
+**Call Log Search**
+- Search the account call log by date range, direction (Inbound/Outbound), phone number, or extension number
+- Optional client-side filter on call result (e.g. Missed, Voicemail, Accepted)
+- Results displayed in a table and optionally exported to CSV
+- Automatically follows pagination (capped at 10,000 records per search)
+
+**Extension Presence & Device Check**
+- Look up a single extension and see its presence status, telephony state, DND status, and all registered devices — useful for diagnosing "calls not ringing" issues
+
+**Required OAuth permission scopes:** `ReadAccounts` (devices/extensions), `ReadCallLog` (call log search), `ReadPresence` (presence check)
+
+---
+
 ## Installation
 
 ### Clone the repository

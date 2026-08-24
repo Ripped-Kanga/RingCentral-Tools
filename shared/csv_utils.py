@@ -29,6 +29,24 @@ def build_csv(datalist, audit_file_name, date_stamp):
     print(f'Audit written to: {file_path}')
 
 
+def append_csv_row(row, file_name):
+    """Append a single row to a CSV in AuditResults/, writing a header if the file is new.
+    Used for incremental event logs (e.g. handset status changes) where rewriting
+    the whole file each time is not appropriate."""
+    ensure_audit_dir()
+
+    file_path = AUDIT_DIR / file_name
+    write_header = not file_path.exists()
+
+    with open(file_path, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=list(row.keys()), extrasaction='ignore')
+        if write_header:
+            writer.writeheader()
+        writer.writerow(row)
+
+    return file_path
+
+
 def cq_build_csv(datalist, audit_file_name, date_stamp):
     """Write call queue audit data to a timestamped CSV in AuditResults/."""
     ensure_audit_dir()
