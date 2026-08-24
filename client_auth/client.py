@@ -74,30 +74,47 @@ class RingCentralOAuthClient:
         httpd.shutdown()
         return auth_code_holder['code']
 
+    def _token_request(self, data):
+        """POST to the token endpoint. RingCentral expects client credentials
+        via HTTP Basic auth for confidential apps; public (PKCE-only) apps
+        send client_id in the body instead. Surfaces the API's error
+        description on failure rather than a bare HTTP status."""
+        auth = None
+        if self.client_secret:
+            auth = (self.client_id, self.client_secret)
+        else:
+            data['client_id'] = self.client_id
+
+        response = requests.post(self.token_url, data=data, auth=auth)
+        if response.status_code >= 400:
+            try:
+                err = response.json()
+                print(
+                    f"Token endpoint error {response.status_code}: "
+                    f"{err.get('error', '')} — {err.get('error_description', response.text)}"
+                )
+            except ValueError:
+                print(f"Token endpoint error {response.status_code}: {response.text}")
+        response.raise_for_status()
+        return response.json()
+
     def _exchange_code_for_token(self, code):
         data = {
             'grant_type': 'authorization_code',
             'code': code,
             'redirect_uri': self.redirect_uri,
-            'client_id': self.client_id,
-            'client_secret': self.client_secret,
             'access_token_ttl': 600, # 10 minutes
             'code_verifier': self.code_verifier
         }
-        response = requests.post(self.token_url, data=data)
-        response.raise_for_status()
-        self.token_data = response.json()
+        self.token_data = self._token_request(data)
         self._save_token()
 
     def _refresh_token(self):
         data = {
             'grant_type': 'refresh_token',
-            'refresh_token': self.token_data['refresh_token'],
-            'client_id': self.client_id
+            'refresh_token': self.token_data['refresh_token']
         }
-        response = requests.post(self.token_url, data=data)
-        response.raise_for_status()
-        self.token_data = response.json()
+        self.token_data = self._token_request(data)
         self._save_token()
 
     def authenticate(self):
