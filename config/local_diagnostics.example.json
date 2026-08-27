@@ -1,0 +1,231 @@
+{
+  "_comment": [
+    "Local diagnostics configuration for RingCentral-Tools.",
+    "Edit sip_proxies to match the proxies your tenancy actually uses \u2014 the",
+    "definitive list for a tenancy comes from GET /restapi/v1.0/client-info/",
+    "sip-provision, or from RingCentral's network requirements article for",
+    "your region. Hosts that do not resolve are reported as NXDOMAIN.",
+    "Set sip_account.enabled to true and fill in the credentials to enable",
+    "the SIP OPTIONS and REGISTER tests."
+  ],
+  "settings": {
+    "latency_samples": 20,
+    "sample_interval_ms": 120,
+    "timeout_seconds": 3.0,
+    "icmp_enabled": true,
+    "traceroute_enabled": false,
+    "traceroute_max_hops": 20,
+    "check_tls": false,
+    "tls_verify": true
+  },
+  "thresholds": {
+    "latency_ms": {
+      "good": 150.0,
+      "fair": 300.0
+    },
+    "jitter_ms": {
+      "good": 20.0,
+      "fair": 30.0
+    },
+    "loss_pct": {
+      "good": 1.0,
+      "fair": 3.0
+    }
+  },
+  "sip_proxies": [
+    {
+      "host": "sip.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip10.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip11.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip20.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip21.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip30.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip40.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip50.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip60.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip61.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip70.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip71.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip80.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    },
+    {
+      "host": "sip90.ringcentral.com",
+      "udp": [
+        5060
+      ],
+      "tcp": [
+        5090
+      ],
+      "tls": [
+        5096
+      ]
+    }
+  ],
+  "https_endpoints": [
+    "https://platform.ringcentral.com/restapi/v1.0",
+    "https://login.ringcentral.com",
+    "https://app.ringcentral.com"
+  ],
+  "stun_servers": [
+    {
+      "host": "stun.cloudflare.com",
+      "port": 3478
+    },
+    {
+      "host": "stun.l.google.com",
+      "port": 19302
+    }
+  ],
+  "sip_account": {
+    "enabled": false,
+    "_comment": "username is the SIP user (often the DID or extension), auth_id is the authorization ID RingCentral issues. If auth_id is blank the username is used for digest auth.",
+    "username": "16135551234",
+    "auth_id": "802345678",
+    "password": "REPLACE_ME",
+    "domain": "sip.ringcentral.com",
+    "outbound_proxy": "",
+    "transport": "tls",
+    "register_expires": 300
+  }
+}

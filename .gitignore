@@ -206,3 +206,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# RingCentral-Tools
+#  Local diagnostics config may contain a SIP password — the redacted example
+#  file is committed instead.
+config/local_diagnostics.json

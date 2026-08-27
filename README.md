@@ -8,11 +8,91 @@ A modular, CLI-based toolkit for auditing and administering RingCentral instance
 
 RingCentral-Tools is designed to grow into a full suite of auditing and reporting modules for RingCentral administrators. Each module is self-contained and registered in a central menu, making it easy to add new capabilities over time without touching existing functionality.
 
-On launch, the tool authenticates via OAuth, verifies connectivity, and presents an interactive menu to select which module to run.
+On launch the tool presents a menu with two paths:
+
+- **Run Local Diagnostics** — network health checks from the machine you are sitting at. No RingCentral account, OAuth app, or internet-facing credentials required.
+- **Connect to a RingCentral Tenancy** — authenticates via OAuth, verifies connectivity, and presents the module menu below.
+
+Authentication only happens on the tenancy path, so the local diagnostics can be run on a customer site with no RingCentral app credentials to hand.
 
 ---
 
-## Current Modules
+## Local Diagnostics
+
+Runs entirely from the local machine and never contacts the RingCentral API. Intended for answering "is the network at this site fit for VoIP, and can it reach RingCentral?" before or instead of looking at the tenancy.
+
+All checks are read-only, no calls are placed, and nothing is billable.
+
+**Checks available**
+
+| Check | What it proves |
+|---|---|
+| Latency, Jitter & Packet Loss | TCP connect round-trips to each SIP proxy on each port, plus an ICMP figure where `ping` is available. Reports min/avg/max, jitter and loss against VoIP thresholds. |
+| SIP Signalling (OPTIONS) | Sends real SIP `OPTIONS` requests over UDP and TCP (and TLS, if enabled) and measures the signalling round trip. Any final response (including 403/404) proves the path. |
+| SIP ALG Detection | Checks whether a firewall SIP ALG is rewriting signalling in flight — the most common cause of one-way audio, failed registration and dropped calls on unencrypted SIP. |
+| SIP Registration | Performs a real digest-authenticated `REGISTER` using credentials from the config file, confirming the registrar is reachable and the credentials are valid. |
+| DNS Resolution | Resolves every configured SIP, STUN and HTTPS host and times the lookup. |
+| NAT Behaviour (STUN) | Queries two independently operated STUN servers from one local UDP port. A mapping that changes per destination means **symmetric NAT** — the most common cause of one-way audio and dropped registrations. |
+| TLS Certificates | **Off by default.** Completes the handshake on each SIP TLS port and reports protocol, cipher, issuer, expiry, forward secrecy and SHA-256 fingerprint. Flags POPs that only negotiate legacy crypto. |
+| HTTPS Endpoints | Confirms the RingCentral API and app endpoints are reachable and times the round trip. |
+| Traceroute | Path to each SIP proxy, via the system `traceroute`/`tracepath`/`tracert`. |
+| Local Host & Network | Local IP, gateway, interface MTU, DNS servers in use, and LAN round trip to the gateway. |
+
+**Run Full Local Health Check** runs everything above in one pass and offers to save the whole report as a timestamped text file in `AuditResults/`.
+
+### Reading the results
+
+Every check is graded `[ OK ]`, `[WARN]`, `[FAIL]` or `[SKIP]`. Two grading rules are worth knowing:
+
+- **Jitter and packet loss can fail a path on their own; a high round trip cannot.** A long round trip with clean jitter and zero loss is the signature of a geographically distant proxy, not a broken network, so it is capped at a warning.
+- **A SIP TLS certificate that does not chain to a public root is normal.** `sip.ringcentral.com` is signed by RingCentral's own private CA. (The numbered POPs use public EV certificates instead.) The check reports the issuer so that an *unexpected* issuer — which would indicate TLS interception — still stands out.
+- **A TLS warning is not a blocked port.** Where a POP only completes the handshake at a lowered OpenSSL security level, the check says so explicitly rather than reporting a connection failure.
+
+Some results are expected and are reported as warnings rather than failures: RingCentral answers `OPTIONS` on TCP and TLS but ignores them on UDP from unregistered sources, so a silent UDP result is not evidence of a blocked port.
+
+### Configuration
+
+On first run a config file is created at `config/local_diagnostics.json`, seeded from `config/local_diagnostics.example.json`. It holds the target lists, the pass/fail thresholds, and optionally a set of SIP credentials. It is git-ignored, because it can contain a SIP password.
+
+```jsonc
+{
+  "settings":   { "latency_samples": 20, "timeout_seconds": 3.0, "icmp_enabled": true },
+  "thresholds": { "latency_ms": {"good": 150.0, "fair": 300.0},
+                  "jitter_ms":  {"good": 20.0,  "fair": 30.0},
+                  "loss_pct":   {"good": 1.0,   "fair": 3.0} },
+  "sip_proxies": [
+    {"host": "sip.ringcentral.com", "udp": [5060], "tcp": [5090], "tls": [5096]}
+  ],
+  "sip_account": {
+    "enabled":   false,
+    "username":  "",
+    "auth_id":   "",
+    "password":  "",
+    "domain":    "sip.ringcentral.com",
+    "transport": "tls"
+  }
+}
+```
+
+The shipped proxy list covers `sip` and `sip10/11/20/21/30/40/50/60/61/70/71/80/90.ringcentral.com` — each one verified to answer SIP `OPTIONS` on TCP 5090. (`sip1.ringcentral.com` resolves but does not answer SIP, so it is deliberately absent.)
+
+> **Still confirm the list against your tenancy.** The proxies a tenancy actually uses differ by region and are returned by `GET /restapi/v1.0/client-info/sip-provision`. Hosts that do not exist are reported as NXDOMAIN by the DNS check rather than failing silently.
+
+#### TLS is off by default
+
+RingCentral handsets are normally provisioned for **unencrypted SIP on TCP 5090**. Nothing on 5096 affects those phones, so `settings.check_tls` defaults to `false` — it only adds handshake time and reports findings that cannot apply. Set it to `true` if a site uses encrypted signalling.
+
+The check that matters on 5090 is **SIP ALG Detection**. Because signalling is unencrypted, a firewall ALG can rewrite the addresses inside it as it passes; the check sends an `OPTIONS` request and verifies the `Via` header the proxy echoes back is byte-for-byte what was sent. `received`/`rport` coming back is normal RFC 3581 NAT traversal and is reported as information, not tampering. An ALG cannot read TLS, so this check only applies to UDP and TCP.
+
+When TLS **is** enabled, one thing to expect: every **numbered** POP negotiates Diffie-Hellman parameters below OpenSSL 3.x's default security level, so a modern client refuses the handshake with `DH_KEY_TOO_SMALL`. Only `sip.ringcentral.com` negotiates cleanly (ECDHE, forward secrecy).
+
+This tool retries such handshakes at a lowered security level so the path can still be measured, then reports it as a **warning** with the negotiated cipher — because the port is open and reachable, and the real risk is that softphones on current OS builds may fail TLS against that POP with no firewall involved. Without this handling the check would report a false "TLS blocked".
+
+**Enabling the SIP registration test** — set `sip_account.enabled` to `true` and fill in `username`, `password` and `domain`. `auth_id` is the authorization ID RingCentral issues; leave it blank to use the username. The test registers, confirms the result, then immediately releases the binding with an `Expires: 0` REGISTER so a live handset does not lose its registration.
+
+---
+
+## Tenancy Modules
 
 ### User Extension Audit
 Performs a comprehensive audit of all extensions on a RingCentral account and exports results to CSV.
@@ -63,8 +143,8 @@ Manages custom answering rules on the company Auto-Receptionist.
 
 ---
 
-### Diagnostics
-Read-only troubleshooting tools for a live RingCentral instance.
+### Tenancy Diagnostics
+Read-only troubleshooting tools for a live RingCentral instance. (For network-level checks that need no tenancy, see [Local Diagnostics](#local-diagnostics) above.)
 
 **Handset Registration Poll**
 - Polls the registration status of account devices at a user-controlled interval (minimum 10 seconds)
@@ -119,11 +199,19 @@ python main.py
 | `--client_id` | Provide the OAuth Client ID at runtime |
 | `--client_secret` | Provide the OAuth Client Secret at runtime |
 | `--clear-creds` | Clear saved credentials and force re-authentication |
+| `--local` | Skip the launch menu and go straight to local diagnostics |
 
-If `--client_id` and `--client_secret` are not provided, the tool will prompt for them interactively.
+If `--client_id` and `--client_secret` are not provided, the tool will prompt for them interactively — but only when the tenancy path is chosen.
 
-### Example
+### Examples
 ```bash
+# Launch menu (local diagnostics or tenancy)
+python main.py
+
+# Straight to local network diagnostics — no credentials needed
+python main.py --local
+
+# Straight into a tenancy with credentials supplied
 python main.py --client_id YOUR_CLIENT_ID --client_secret YOUR_CLIENT_SECRET
 ```
 
@@ -148,6 +236,8 @@ MODULE_REGISTRY = {
 
 The module will automatically appear in the interactive menu — no other changes required.
 
+Modules in `MODULE_REGISTRY` are handed an authenticated OAuth client. `local_diagnostics` accepts and ignores that argument, so it can be reached both from the launch menu (with no client) and from the tenancy module menu.
+
 ---
 
 ## Notes
@@ -156,3 +246,6 @@ The module will automatically appear in the interactive menu — no other change
 - Output CSV files are stored in the `AuditResults/` directory
 - Selecting more fields during an audit increases runtime and API call volume; the tool will automatically pause if rate limits are hit
 - Write modules (e.g. Auto-Receptionist Rules) operate against your **live** RingCentral account — test against a sandbox instance where possible
+- Local diagnostics reports are written to `AuditResults/` as timestamped `.txt` files
+- `config/local_diagnostics.json` is git-ignored because it can hold a SIP password; commit changes to `config/local_diagnostics.example.json` instead
+- Local diagnostics require no extra dependencies — the SIP, STUN and network probes are implemented directly on the Python standard library
