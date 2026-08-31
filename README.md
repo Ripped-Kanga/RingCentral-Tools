@@ -150,13 +150,22 @@ Read-only troubleshooting tools for a live RingCentral instance. (For network-le
 - Polls the registration status of account devices at a user-controlled interval (minimum 10 seconds)
 - Watch all device types or a selection (HardPhone, SoftPhone, OtherPhone, WebPhone, Paging, Room)
 - Reports every Online ↔ Offline transition as it happens, with device name, model, serial, and extension
-- Optionally appends each status change to a timestamped CSV event log
+- Optionally appends each status change to a timestamped CSV event log, with both the raw `Serial` and a colon-separated `MAC Address` column
 - Automatically refreshes the OAuth token during long polling sessions
 - Press **CTRL+C** to stop polling and see a session summary
 
+> **On serial numbers and MAC addresses.** RingCentral returns a HardPhone's
+> serial as the handset's MAC address in unseparated hex (`48256757A868`). The
+> tool prints it colon-separated (`48:25:67:57:A8:68`) so it can be pasted
+> straight into a switch ARP table or DHCP lease list, and the CSV exports carry
+> both forms. The same `serial` field holds an *endpoint ID* rather than a MAC
+> for SoftPhone and mobile clients, and is empty for a HardPhone that has not
+> yet been shipped and provisioned — in those cases the value is shown as-is and
+> the `MAC Address` column is left blank.
+
 **Device Status Snapshot**
 - One-shot report of every device on the account with status counts (Online/Offline)
-- Optional CSV export
+- Optional CSV export, with both the raw `Serial` and a colon-separated `MAC Address` column
 
 **Call Log Search**
 - Search the account call log by date range, direction (Inbound/Outbound), phone number, or extension number

@@ -48,6 +48,39 @@ def _device_ext_label(device):
     return ext.get('extensionNumber') or ext.get('id') or ''
 
 
+def _format_mac(serial):
+    """Colon-separated form of a serial that is a MAC address, else ''.
+
+    RingCentral returns a HardPhone serial as the handset's MAC in unseparated
+    hex (e.g. '48256757A868'), which is awkward to paste into an ARP table or
+    DHCP lease list. SoftPhone and mobile records carry an endpoint ID in the
+    same field, so anything that is not 12 hex digits is left to the caller.
+    """
+    raw = str(serial or '').strip().replace(':', '').replace('-', '').replace('.', '')
+    if len(raw) != 12 or not set(raw) <= set('0123456789abcdefABCDEF'):
+        return ''
+    raw = raw.upper()
+    return ':'.join(raw[i:i + 2] for i in range(0, 12, 2))
+
+
+def _device_serial_label(device):
+    """The serial in its most useful form: colon-separated when it is a MAC,
+    otherwise exactly as the API returned it. '' when there is no serial."""
+    serial = str(device.get('serial') or '').strip()
+    return _format_mac(serial) or serial
+
+
+def _device_serial_tag(device):
+    """Bracketed serial for inline output, or '' when the API returns none.
+
+    For a HardPhone the serial is the handset's MAC address; for SoftPhone and
+    mobile clients it is an endpoint ID instead. A HardPhone serial is only
+    returned once the handset has been shipped and provisioned.
+    """
+    label = _device_serial_label(device)
+    return f'[serial {label}] ' if label else ''
+
+
 def _fmt_local(iso_str):
     """Convert an ISO 8601 UTC timestamp from the API to local time for display."""
     if not iso_str:
@@ -87,7 +120,7 @@ def _print_device_table(devices):
             f"{str(d.get('type', '')):<10} "
             f"{str((d.get('model') or {}).get('name', '')):<20} "
             f"{str(_device_ext_label(d)):<8} "
-            f"{str(d.get('serial') or ''):<18} "
+            f"{_device_serial_label(d):<18} "
             f"{d.get('status', 'Unknown')}"
         )
     print(f'{"─" * 100}')
@@ -191,6 +224,7 @@ def _handset_poll(client):
                         print(
                             f"    - {d.get('name', 'Unknown')} "
                             f"[ext {_device_ext_label(d)}] "
+                            f"{_device_serial_tag(d)}"
                             f"({(d.get('model') or {}).get('name', d.get('type', ''))}) "
                             f"— {d.get('status', 'Unknown')}"
                         )
@@ -212,6 +246,7 @@ def _handset_poll(client):
                     print(
                         f"  {marker} {d.get('name', 'Unknown')} "
                         f"[ext {_device_ext_label(d)}] "
+                        f"{_device_serial_tag(d)}"
                         f"({(d.get('model') or {}).get('name', d.get('type', ''))}) "
                         f"changed: {old} → {new}"
                     )
@@ -223,6 +258,7 @@ def _handset_poll(client):
                             'Type':            d.get('type', ''),
                             'Model':           (d.get('model') or {}).get('name', ''),
                             'Serial':          d.get('serial') or '',
+                            'MAC Address':     _format_mac(d.get('serial')),
                             'Extension':       _device_ext_label(d),
                             'Previous Status': old,
                             'New Status':      new,
@@ -274,6 +310,7 @@ def _device_snapshot(client):
             'Type':        d.get('type', ''),
             'Model':       (d.get('model') or {}).get('name', ''),
             'Serial':      d.get('serial') or '',
+            'MAC Address': _format_mac(d.get('serial')),
             'Extension':   _device_ext_label(d),
             'Site':        (d.get('site') or {}).get('name', ''),
             'Status':      d.get('status', 'Unknown'),
