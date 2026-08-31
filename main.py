@@ -9,10 +9,12 @@ __disclaimer__ = "The purpose of this project is to provide easy auditability an
 
 
 # Import libraries
-from client_auth.client import RingCentralOAuthClient
+from client_auth.client import RingCentralOAuthClient, RingCentralJWTClient
 from shared.api_utils import connection_test
 from modules import user_audit, auto_receptionist, diagnostics, local_diagnostics
 import argparse
+import getpass
+import os
 import sys
 
 from pick import pick
@@ -24,7 +26,7 @@ TOKEN_URL = "https://platform.ringcentral.com/restapi/oauth/token"
 API_BASE_URL = "https://platform.ringcentral.com"
 
 # Module registry — add new tenancy modules here as a display name: module mapping.
-# Every module in this registry receives an authenticated OAuth client.
+# Every module in this registry receives an authenticated client (OAuth or JWT).
 MODULE_REGISTRY = {
     "User Extension Audit":          user_audit,
     "Auto-Receptionist Rules":       auto_receptionist,
@@ -36,13 +38,54 @@ LOCAL_OPTION = "Run Local Diagnostics (no RingCentral account needed)"
 TENANCY_OPTION = "Connect to a RingCentral Tenancy"
 EXIT_OPTION = "Exit"
 
+# Environment variable used to supply a JWT without putting it on the command
+# line, where it would be visible in shell history and the process list.
+JWT_ENV_VAR = "RINGCENTRAL_JWT"
+
+OAUTH_AUTH_OPTION = "OAuth browser login (interactive, opens a browser)"
+JWT_AUTH_OPTION = "JWT credential (no RingCentral login required)"
+
+
+def choose_auth_method(args):
+    """Resolve the authentication flow from the CLI, the environment, or a
+    prompt. A JWT supplied by either route implies the JWT flow."""
+    if args.auth:
+        return args.auth
+    if args.jwt or os.environ.get(JWT_ENV_VAR):
+        return "jwt"
+
+    chosen, _ = pick(
+        [OAUTH_AUTH_OPTION, JWT_AUTH_OPTION],
+        "How would you like to authenticate to the tenancy?",
+        indicator="\u25BA\u25BA "
+    )
+    return "jwt" if chosen == JWT_AUTH_OPTION else "oauth"
+
 
 def build_client(args):
     """Prompt for credentials as needed and return an authenticated client."""
+    method = choose_auth_method(args)
+
     client_id = str(args.client_id) if args.client_id else input("Enter the Application Client ID: ")
     client_secret = str(args.client_secret) if args.client_secret else input("Enter the Application Client Secret: ")
 
-    oauth_client = RingCentralOAuthClient(
+    if method == "jwt":
+        client = build_jwt_client(args, client_id, client_secret)
+    else:
+        client = build_oauth_client(args, client_id, client_secret)
+
+    if args.clear_creds:
+        client.clear_credentials()
+
+    client.authenticate()
+
+    # Verify connectivity and display company banner
+    connection_test(client)
+    return client
+
+
+def build_oauth_client(args, client_id, client_secret):
+    return RingCentralOAuthClient(
         client_id=client_id,
         client_secret=client_secret,
         redirect_uri=REDIRECTION_URI,
@@ -51,17 +94,30 @@ def build_client(args):
         api_base_url=API_BASE_URL
     )
 
-    if args.clear_creds:
-        oauth_client.clear_credentials()
 
-    oauth_client.authenticate()
+def build_jwt_client(args, client_id, client_secret):
+    """Build a client that authenticates with a JWT credential issued from the
+    RingCentral developer console. The JWT is read from --jwt, then the
+    environment, then an echo-free prompt, and is never written to disk."""
+    jwt_assertion = args.jwt or os.environ.get(JWT_ENV_VAR)
+    if not jwt_assertion:
+        print(f"No JWT supplied via --jwt or ${JWT_ENV_VAR}.")
+        jwt_assertion = getpass.getpass("Paste the JWT credential (input hidden): ")
 
-    # Verify connectivity and display company banner
-    connection_test(oauth_client)
-    return oauth_client
+    jwt_assertion = jwt_assertion.strip()
+    if not jwt_assertion:
+        raise ValueError("A JWT credential is required for JWT authentication.")
+
+    return RingCentralJWTClient(
+        client_id=client_id,
+        client_secret=client_secret,
+        jwt_assertion=jwt_assertion,
+        token_url=TOKEN_URL,
+        api_base_url=API_BASE_URL
+    )
 
 
-def tenancy_menu(oauth_client):
+def tenancy_menu(client):
     """Module dispatch loop for an authenticated tenancy."""
     menu_options = list(MODULE_REGISTRY.keys()) + ["Back to Launch Menu", EXIT_OPTION]
 
@@ -76,7 +132,7 @@ def tenancy_menu(oauth_client):
 
         module = MODULE_REGISTRY[chosen]
         try:
-            module.run(oauth_client)
+            module.run(client)
         except KeyboardInterrupt:
             print("\nModule interrupted by user.")
         except Exception as e:
@@ -108,7 +164,7 @@ def launch_menu(args):
             continue
 
         try:
-            oauth_client = build_client(args)
+            client = build_client(args)
         except KeyboardInterrupt:
             print("\nAuthentication cancelled.")
             continue
@@ -117,7 +173,7 @@ def launch_menu(args):
             input("Press Enter to return to the launch menu...")
             continue
 
-        tenancy_menu(oauth_client)
+        tenancy_menu(client)
 
 
 def main():
@@ -130,6 +186,17 @@ def main():
     parser.add_argument(
         "--client_secret",
         help="Specify the Application Client Secret at runtime, requires --client_id to work."
+    )
+    parser.add_argument(
+        "--auth",
+        choices=["oauth", "jwt"],
+        help="Authentication flow to use. Defaults to jwt when a JWT is supplied, "
+             "otherwise the tool asks at the tenancy prompt."
+    )
+    parser.add_argument(
+        "--jwt",
+        help=f"JWT credential for the JWT auth flow. Prefer the ${JWT_ENV_VAR} environment "
+             "variable or the interactive prompt, so the token stays out of shell history."
     )
     parser.add_argument(
         "--clear-creds",

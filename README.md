@@ -11,7 +11,7 @@ RingCentral-Tools is designed to grow into a full suite of auditing and reportin
 On launch the tool presents a menu with two paths:
 
 - **Run Local Diagnostics** — network health checks from the machine you are sitting at. No RingCentral account, OAuth app, or internet-facing credentials required.
-- **Connect to a RingCentral Tenancy** — authenticates via OAuth, verifies connectivity, and presents the module menu below.
+- **Connect to a RingCentral Tenancy** — authenticates via OAuth or a JWT credential, verifies connectivity, and presents the module menu below.
 
 Authentication only happens on the tenancy path, so the local diagnostics can be run on a customer site with no RingCentral app credentials to hand.
 
@@ -196,8 +196,10 @@ python main.py
 
 | Argument | Description |
 |---|---|
-| `--client_id` | Provide the OAuth Client ID at runtime |
-| `--client_secret` | Provide the OAuth Client Secret at runtime |
+| `--client_id` | Provide the application Client ID at runtime |
+| `--client_secret` | Provide the application Client Secret at runtime |
+| `--auth` | Authentication flow: `oauth` or `jwt`. Defaults to `jwt` when a JWT is supplied, otherwise the tool asks |
+| `--jwt` | JWT credential for the JWT flow (prefer `$RINGCENTRAL_JWT` or the hidden prompt) |
 | `--clear-creds` | Clear saved credentials and force re-authentication |
 | `--local` | Skip the launch menu and go straight to local diagnostics |
 
@@ -211,9 +213,48 @@ python main.py
 # Straight to local network diagnostics — no credentials needed
 python main.py --local
 
-# Straight into a tenancy with credentials supplied
-python main.py --client_id YOUR_CLIENT_ID --client_secret YOUR_CLIENT_SECRET
+# Tenancy via OAuth browser login
+python main.py --auth oauth --client_id YOUR_CLIENT_ID --client_secret YOUR_CLIENT_SECRET
+
+# Tenancy via JWT — the token is read from the environment, never the command line
+export RINGCENTRAL_JWT='eyJraWQiOi...'
+python main.py --auth jwt --client_id YOUR_CLIENT_ID --client_secret YOUR_CLIENT_SECRET
 ```
+
+---
+
+## Authentication
+
+Two flows are supported. Both use the same RingCentral app credentials (Client ID and Client Secret) and both hand the modules an identical client, so every module works the same way under either.
+
+### OAuth browser login
+
+The interactive flow. Opens a browser, the operator logs in to RingCentral, and the returned code is exchanged for a token pair. The token pair is cached in `rc_token.json` (gitignored) and refreshed automatically. Use this for your own day-to-day work.
+
+### JWT credential
+
+For giving someone API access **without giving them a RingCentral platform login** — for example handing a customer's IT team or an external tester access to a tenancy for the duration of a project.
+
+A JWT is issued from the RingCentral developer console and grants API access under the permissions of the user who issued it. It carries no console or admin UI access, and it can be revoked from the console at any time without touching any user account.
+
+**Setting one up:**
+
+1. In the [RingCentral developer console](https://developers.ringcentral.com), make sure the app has **JWT auth flow** enabled under its Auth settings, and that its scopes cover the modules to be run (see the per-module scope notes above).
+2. Under **Credentials → JWT**, create a JWT scoped to that app, and set an expiry that matches how long access is needed.
+3. Give the holder the JWT along with the app's Client ID and Client Secret.
+
+**Running with it:**
+
+```bash
+export RINGCENTRAL_JWT='eyJraWQiOi...'
+python main.py --auth jwt
+```
+
+The JWT is read from `--jwt`, then `$RINGCENTRAL_JWT`, then a hidden interactive prompt. It is **never written to disk** — access tokens are held in memory only and re-minted from the JWT as they expire, so there is no refresh token to manage and nothing left behind on the machine when the tool exits.
+
+Prefer the environment variable or the prompt over `--jwt`; a value passed on the command line is visible in shell history and the process list.
+
+**When access should end:** revoke the JWT in the developer console. Any tokens minted from it stop working within their remaining lifetime (one hour at most), and no new ones can be issued.
 
 ---
 
@@ -236,7 +277,7 @@ MODULE_REGISTRY = {
 
 The module will automatically appear in the interactive menu — no other changes required.
 
-Modules in `MODULE_REGISTRY` are handed an authenticated OAuth client. `local_diagnostics` accepts and ignores that argument, so it can be reached both from the launch menu (with no client) and from the tenancy module menu.
+Modules in `MODULE_REGISTRY` are handed an authenticated client (OAuth or JWT — both expose the same `authenticate()` / `api_get()` / `api_post()` interface). `local_diagnostics` accepts and ignores that argument, so it can be reached both from the launch menu (with no client) and from the tenancy module menu.
 
 ---
 
