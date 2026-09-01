@@ -44,6 +44,22 @@ def rate_limit_post(client, endpoint, json_body):
                 raise
 
 
+def fetch_extension_map(client):
+    """id -> (extensionNumber, name) for every extension on the account, so
+    per-extension events can be labelled with numbers instead of raw IDs."""
+    ext_map = {}
+    page = 1
+    while True:
+        resp = rate_limit_get(client, f'/restapi/v1.0/account/~/extension?perPage=1000&page={page}')
+        if resp is None:
+            return ext_map
+        for e in resp.get('records', []):
+            ext_map[str(e['id'])] = (e.get('extensionNumber', ''), e.get('name', ''))
+        if page >= resp.get('paging', {}).get('totalPages', 1):
+            return ext_map
+        page += 1
+
+
 def connection_test(client):
     """
     Verifies API connectivity and prints company info.

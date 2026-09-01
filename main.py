@@ -11,7 +11,7 @@ __disclaimer__ = "The purpose of this project is to provide easy auditability an
 # Import libraries
 from client_auth.client import RingCentralOAuthClient, RingCentralJWTClient
 from shared.api_utils import connection_test
-from modules import user_audit, auto_receptionist, diagnostics, local_diagnostics
+from modules import user_audit, auto_receptionist, diagnostics, local_diagnostics, call_monitor, dnd_monitor
 import argparse
 import getpass
 import os
@@ -31,6 +31,8 @@ MODULE_REGISTRY = {
     "User Extension Audit":          user_audit,
     "Auto-Receptionist Rules":       auto_receptionist,
     "Tenancy Diagnostics":           diagnostics,
+    "Live Call Monitor":             call_monitor,
+    "DND Status Monitor":            dnd_monitor,
     "Local Network Diagnostics":     local_diagnostics,
 }
 

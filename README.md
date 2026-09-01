@@ -180,6 +180,55 @@ Read-only troubleshooting tools for a live RingCentral instance. (For network-le
 
 ---
 
+### Live Call Monitor
+Streams telephony session events in real time over a RingCentral WebSocket — every state change of every monitored call (Setup, Proceeding, Answered, Hold, Parked, Voicemail, Disconnected, and the disconnect reason) as it happens.
+
+**Features:**
+- **Account-level monitoring** — one subscription covering every extension on the tenancy
+- **Extension-level monitoring** — watch up to 20 specific extensions, entered by extension number
+- Optional direction filter (Inbound / Outbound / All)
+- Two display views:
+  - **Live table view** — an in-place updating TUI table (via `rich`) showing the most recent events with colour-coded statuses, a connection status bar, and a running event count
+  - **Plain scrolling log** — one line per event, better for capture, tmux scrollback, or piping to a file
+- Optional CSV event log — every party event appended as it arrives to a timestamped file in `AuditResults/`, including timestamps, status, disconnect reason, direction, extension, caller/callee names and numbers, missed-call flag, telephony session ID, and party ID (session IDs let you correlate the legs of a call afterwards)
+- Events are labelled with extension numbers, not raw IDs — the extension list is resolved up front
+- Automatic reconnection with backoff — the RingCentral WebSocket server idle-times-out quiet connections after 30 minutes and force-disconnects all clients every 24 hours; the monitor reconnects and resubscribes transparently, and keeps the connection alive with heartbeats in between
+- Access tokens are refreshed automatically across reconnects for long monitoring sessions
+- Press **CTRL+C** to stop and see a session summary
+
+The monitor is read-only — it creates an event subscription and never modifies call data. Note that events can occasionally arrive out of order; the `Sequence` column in the CSV allows re-ordering per session.
+
+**Required application permissions:** `Call Control` (telephony session events — without it the subscription is rejected with `SUB-410`), `WebSocket` (required to call the wstoken endpoint — without it the token request fails with `CMN-401`), and `WebSocket Subscriptions` (event delivery). All three are *app* scopes set in the RingCentral developer console.
+
+> **Scope changes do not reach existing logins.** RingCentral fixes an app's
+> scopes into the access token at the moment it is issued, and an OAuth
+> *refresh* keeps the original scope set. If you add these scopes after having
+> already logged in, the saved token in `rc_token.json` will keep failing with
+> `InsufficientPermissions` — run `python main.py --clear-creds` to force a
+> fresh browser authorization. JWT logins mint a fresh token every run and are
+> unaffected. Allow a few minutes for console permission changes to propagate.
+
+---
+
+### DND Status Monitor
+Reports in real time whenever an extension changes its Do Not Disturb status — useful for tracking call queue agents logging in and out of call acceptance, or finding out who keeps flipping a shared line to DND.
+
+**Features:**
+- **Account-level monitoring** — one subscription covering every extension, via the Account Presence event. Presence events fire on *any* presence change (every ringing phone), so the monitor keeps a per-extension baseline and reports **only actual DND transitions**
+- **Extension-level monitoring** — watch up to 20 specific extensions via the dedicated Extension DND Status event
+- On startup, reads the current DND state of the monitored extensions and lists any already in a DND mode, so the first reported change always has a meaningful "previous" value
+- Reports all three DND states: *Take all calls*, *Do not accept ANY calls*, and *Do not accept queue calls* (department/queue DND)
+- Same display views as the Live Call Monitor: colour-coded live table or plain scrolling log
+- Optional CSV log of every change (timestamp, extension, name, previous status, new status — raw API enum values for machine comparison)
+- Automatic reconnection, heartbeats, and token refresh, as per the Live Call Monitor
+- Press **CTRL+C** to stop and see a session summary
+
+The monitor is read-only — it creates an event subscription and never modifies user data.
+
+**Required application permissions:** `Read Accounts` (DND/presence events), `WebSocket`, and `WebSocket Subscriptions`. Unlike the Live Call Monitor, `Call Control` is **not** needed. The scope-change note above applies here too.
+
+---
+
 ## Installation
 
 ### Clone the repository

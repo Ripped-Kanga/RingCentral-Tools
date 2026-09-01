@@ -1,3 +1,5 @@
 pkce
 requests
 pick
+websockets
+rich

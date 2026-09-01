@@ -8,6 +8,53 @@ from pick import pick
 from shared.api_utils import rate_limit_get
 
 
+def resolve_extensions(client, max_count):
+    """Prompt for extension numbers and resolve each to an extension record.
+    Returns a list of records, or None if the user backs out. Used by the live
+    monitor modules to turn user-entered numbers into extension IDs."""
+    while True:
+        raw = input(
+            f'\nExtension number(s) to monitor, comma-separated '
+            f'(max {max_count}, blank to cancel): '
+        ).strip()
+        if not raw:
+            return None
+        numbers = [n.strip() for n in raw.split(',') if n.strip()]
+        if not all(n.isdigit() for n in numbers):
+            print('Please enter numeric extension numbers only.')
+            continue
+        if len(numbers) > max_count:
+            print(
+                f'{len(numbers)} extensions requested — above {max_count}, '
+                'use account-level monitoring instead.'
+            )
+            continue
+
+        found, missing = [], []
+        for number in dict.fromkeys(numbers):  # de-duplicate, keep order
+            resp = rate_limit_get(
+                client, f'/restapi/v1.0/account/~/extension?{urlencode({"extensionNumber": number})}'
+            )
+            records = (resp or {}).get('records', [])
+            if records:
+                found.append(records[0])
+            else:
+                missing.append(number)
+
+        if missing:
+            print(f'Not found on this account: {", ".join(missing)}')
+        if not found:
+            print('No extensions matched. Please try again.')
+            continue
+
+        print('\nExtensions to monitor:')
+        for e in found:
+            print(f"  ext {e.get('extensionNumber', '?'):<6} {e.get('name', '')}")
+        confirm = input('Proceed with these extensions? (y/n): ').strip().lower()
+        if confirm == 'y':
+            return found
+
+
 def audit_checker(client, audit_url):
     """
     Fetch the total extension count and present filter options.
